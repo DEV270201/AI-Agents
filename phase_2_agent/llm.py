@@ -1,11 +1,10 @@
 # this file is responsible for talking with the LLM 
-
 import requests
 
 OLLAMA_URL="http://localhost:11434/api/generate"
-LLM_MODEL="phi3"
+LLM_MODEL="qwen2.5:14b"
 
-def call_LLM(prompt: str, timeout: int = 60) -> str:
+def call_LLM(prompt: str, timeout: int = 300) -> str:
     try:
         # for attempt in range(retries+1):
             response = requests.post(
@@ -14,10 +13,9 @@ def call_LLM(prompt: str, timeout: int = 60) -> str:
                 "model": LLM_MODEL,
                 "prompt": prompt,
                 "stream": False,
-                 "options": {
-                "stop": ["Observation:"], #stop HERE, let your code write the observation
+                "options": {
                 "temperature": 0 
-            }
+               }
             },
 
             timeout=timeout

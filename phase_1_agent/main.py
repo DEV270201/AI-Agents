@@ -18,17 +18,44 @@ Available tools:
 - text_fixer(text)                       → summarizes, fixes and rephrases text
 
 STRICT RULES:
-1. Use ONE tool per step, then WAIT for the Observation.
-2. Once you have enough information, you MUST write Final Answer.
-3. Do NOT call a tool again if you already have the result.
-4. Do NOT invent Observations. Wait for them.
+- Use ONE tool per step, then WAIT for the Observation
+- After getting an Observation, Analyze it and if you have the answer return Final Answer IMMEDIATELY
+- Do NOT call a tool again if you already have the result
+- Do NOT invent Observation. Wait for them (it will be provided to you)
 
-Format (follow EXACTLY):
-Thought: your reasoning
-Action: tool_name[input]
 
-After receiving the Observation, either call another tool OR write:
-Final Answer: your answer to the user
+EXAMPLE 1 — single tool:
+
+User: What is 10 + 5?
+Thought: I need to calculate 10 + 5.
+Action: calculator[10+5]
+Observation: Tool calculator returned -> 15
+Thought: I have the answer. The answer is 15
+Final Answer: 10 + 5 = 15
+
+---
+EXAMPLE 2 — two tools in sequence:
+
+User: Fix grammar and calculate 3*4: she do not like food
+Thought: I need to fix the grammar first.
+Action: text_fixer[she do not like food]
+Observation: Tool text_fixer returned -> She does not like food.
+Thought: Grammar is fixed. Now I need to calculate 3*4.
+Action: calculator[3*4]
+Observation: Tool calculator returned -> 12
+Thought: Both tasks are done. I have all the answers.
+Final Answer: Corrected sentence: She does not like food. And 3 * 4 = 12.
+
+---
+EXAMPLE 3 — api call, then conclude immediately:
+
+User: Fetch user with id 1
+Thought: I need to fetch user data for id 1.
+Action: public_api_user_profile[1]
+Observation: Tool public_api_user_profile returned -> Name: Leanne Graham, Email: Sincere@april.biz
+Thought: I have the user data. I do not need any more tools.
+Final Answer: User 1 is Leanne Graham, email: Sincere@april.biz.
+
 """
 
 def run_agent(user_input: str) -> str:
@@ -59,18 +86,17 @@ def run_agent(user_input: str) -> str:
         result = TOOLS[tool_name](tool_input)
         print(f"Tool '{tool_name}' returned: {result}")
 
-        context += f"\n{response}\nObservation: {result}\n"
+        context += f"\n{response}\nObservation: Tool '{tool_name}' returned -> {result}\n"
     
     return "Max steps reached without a final answer."
 
 
 def main():
-   if __name__ == "__main__":
     queries = [
         "What is 25 * 13?",
         "rephrase this text: I Devansh. I play cricket. I like bowling fast",
-        "Fetch user information from external API for user id: 1",
-        "'Fix the grammar: She do not like the food' and calculate 10+20",
+        "Fetch user information from external API for user id: 2",
+        "'Fix the grammar: Jennifer is a girl. She do not like the food' and calculate 10+20",
     ]
     for q in queries:
         print(f"\n{'='*50}")
