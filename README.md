@@ -121,6 +121,25 @@ Example memory:
 ```
 
 ---
+# Phase 3 — Expense Tracker Agent
+
+Capabilities
+
+* Log expenses through natural language ("I spent $12 on coffee today")
+* Categorize across five fixed buckets: food, entertainment, bills, shopping, travel
+* Resolve relative dates (today, yesterday, N days ago) to ISO format using a UTC reference injected into the system prompt
+* Validate inputs at the application layer (amount, category, date sanity, length limits)
+* Return structured observations the LLM uses to confirm actions to the user
+
+Why It Matters
+
+This phase forced engagement with concerns the previous phases didn't surface: data schema design, mutation safety, error semantics that the LLM can actually act on, and how to keep the agent's response shape expressive enough to handle ambiguity (e.g., needing to ask the user a clarifying question rather than guessing).
+
+Status
+
+The expense tracker currently supports logging only. Update, summarize, and budget tools are deferred to a future phase.
+
+---
 
 # Tech Stack
 
