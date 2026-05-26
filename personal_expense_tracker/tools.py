@@ -1,11 +1,14 @@
 import random
 import re
-import sqlite3
 import time
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Optional, Union
-from db import get_connection, init_db
+
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+from db import get_engine
 
 _ALLOWED_CATEGORIES = frozenset(
     {"food", "bills", "entertainment", "shopping", "travel"}
@@ -43,7 +46,7 @@ def _format_observation_money(cents: int, currency: str) -> str:
     return f"{quantized} {currency}"
 
 
-def tool_add_expense(
+async def tool_add_expense(
     occurred_at: str,
     category: str,
     amount: Optional[Union[int, float, str, Decimal]] = None,
@@ -60,77 +63,76 @@ def tool_add_expense(
     passed by the caller).
     """
 
-    connection = get_connection()
+    ref_day = datetime.now(timezone.utc).date()
+
     try:
-        ref_day = datetime.now(timezone.utc).date()
+        occurred_day = _parse_iso_date_strict(occurred_at)
+    except ValueError:
+        return "Error: invalid occurred_at"
 
-        try:
-            occurred_day = _parse_iso_date_strict(occurred_at)
-        except ValueError:
-            return "Error: invalid occurred_at"
+    if occurred_day > ref_day:
+        return f"Error: occurred_at cannot be after {ref_day.isoformat()} (UTC)"
 
-        if occurred_day > ref_day:
-            return (
-                f"Error: occurred_at cannot be after {ref_day.isoformat()} (UTC)"
+    if category is None or not str(category).strip():
+        return "Error: missing category"
+    cat_norm = str(category).strip().lower()
+    if cat_norm not in _ALLOWED_CATEGORIES:
+        allowed = ", ".join(sorted(_ALLOWED_CATEGORIES))
+        return f"Error: unknown category {category!r}; allowed: {allowed}"
+
+    cur = (currency or "USD").strip().upper()
+    if not _CURRENCY_PATTERN.fullmatch(cur):
+        return f"Error: invalid currency {currency!r} (use 3-letter ISO, e.g. USD)"
+
+    if notes is not None and len(notes) > 255:
+        return "Error: notes exceed 255 characters"
+
+    if amount is None or isinstance(amount, bool):
+        return "Error: missing amount"
+    try:
+        cents = _major_units_to_cents(amount)
+    except ValueError:
+        return "Error: invalid amount"
+
+    if cents <= 0:
+        return "Error: amount must be positive"
+
+    sql_notes: Optional[str] = None if notes is None else str(notes)
+
+    try:
+        engine = get_engine()
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    """
+                    INSERT INTO expenses (occurred_at, amount, currency, category, notes)
+                    VALUES (:occurred_at, :amount, :currency, :category, :notes)
+                    """
+                ),
+                {
+                    "occurred_at": occurred_day.isoformat(),
+                    "amount": cents,
+                    "currency": cur,
+                    "category": cat_norm,
+                    "notes": sql_notes,
+                },
             )
+            new_id = getattr(result, "lastrowid", None)
+            if not new_id:
+                last_id = await conn.execute(text("SELECT LAST_INSERT_ID()"))
+                new_id = last_id.scalar_one()
 
-        if category is None or not str(category).strip():
-            return "Error: missing category"
-        cat_norm = str(category).strip().lower()
-        if cat_norm not in _ALLOWED_CATEGORIES:
-            allowed = ", ".join(sorted(_ALLOWED_CATEGORIES))
+            notes_display = "" if sql_notes is None else sql_notes.replace('"', '\\"')
+            notes_part = "none" if sql_notes is None else f'"{notes_display}"'
+            money = _format_observation_money(cents, cur)
             return (
-                f"Error: unknown category {category!r}; "
-                f"allowed: {allowed}"
+                f"Logged expense id={new_id}: {money} on {occurred_day.isoformat()}, "
+                f"category={cat_norm}, notes={notes_part}."
             )
-
-        cur = (currency or "USD").strip().upper()
-        if not _CURRENCY_PATTERN.fullmatch(cur):
-            return f"Error: invalid currency {currency!r} (use 3-letter ISO, e.g. USD)"
-
-        if notes is not None and len(notes) > 255:
-            return "Error: notes exceed 255 characters"
-
-        if amount is None or isinstance(amount, bool):
-            return "Error: missing amount"
-        try:
-            cents = _major_units_to_cents(amount)
-        except ValueError:
-            return "Error: invalid amount"
-
-        if cents <= 0:
-            return "Error: amount must be positive"
-
-        sql_notes: Optional[str] = None if notes is None else str(notes)
-
-        cur_sql = connection.cursor()
-        cur_sql.execute(
-            """
-            INSERT INTO expenses (occurred_at, amount, currency, category, notes)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (occurred_day.isoformat(), cents, cur, cat_norm, sql_notes),
-        )
-        connection.commit()
-        new_id = cur_sql.lastrowid
-
-        notes_display = "" if sql_notes is None else sql_notes.replace('"', '\\"')
-        notes_part = "none" if sql_notes is None else f'"{notes_display}"'
-        money = _format_observation_money(cents, cur)
-        return (
-            f"Logged expense id={new_id}: {money} on {occurred_day.isoformat()}, "
-            f"category={cat_norm}, notes={notes_part}."
-        )
-    except sqlite3.Error as e:
-        try:
-            connection.rollback()
-        except sqlite3.Error:
-            pass
+    except (SQLAlchemyError) as e:
         return f"Error: database {e}"
-    finally:
-        connection.close()
 
-def tool_analyze_text_and_action(text: str) -> str:
+async def tool_analyze_text_and_action(text: str) -> str:
     from llm import call_LLM
 
     prompt = f"""

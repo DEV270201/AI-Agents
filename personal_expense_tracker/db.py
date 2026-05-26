@@ -1,40 +1,59 @@
-"""SQLite access for the expense tracker database."""
+"""MySQL access for the expense tracker via async SQLAlchemy + connection pooling."""
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+import os
+from typing import Optional
 
-_DATA_DIR = Path(__file__).resolve().parent / "data"
-_DB_PATH = _DATA_DIR / "expenser.db"
-_SCHEMA_PATH = _DATA_DIR / "expense_schema.sql"
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from dotenv import load_dotenv
 
-def _apply_schema_if_needed(conn: sqlite3.Connection) -> None:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='expenses' LIMIT 1"
-    ).fetchone()
-    if row is not None:
-        return
-    sql = _SCHEMA_PATH.read_text(encoding="utf-8")
-    conn.executescript(sql)
-    conn.commit()
+_ENGINE: Optional[AsyncEngine] = None
 
 
-def init_db() -> None:
-    """Create the data directory and database file, and apply ``expense_schema.sql`` when tables are missing."""
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH)
-    try:
-        _apply_schema_if_needed(conn)
-    finally:
-        conn.close()
+def get_engine() -> AsyncEngine:
+    """Return a process-global async SQLAlchemy engine (with pooling)."""
+    global _ENGINE
+    if _ENGINE is not None:
+        return _ENGINE
+
+    url = os.getenv("MYSQL_DATABASE_URL")
+    if not url:
+        raise RuntimeError(
+            "MYSQL_DATABASE_URL is not set. "
+            "Example: mysql+aiomysql://user:pass@host:3306/dbname"
+        )
+
+    _ENGINE = create_async_engine(
+        url,
+        pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+        pool_pre_ping=True,
+    )
+    return _ENGINE
 
 
-def get_connection() -> sqlite3.Connection:
-    """Return a SQLite connection to ``data/expenser.db``.
-
-    Call ``init_db()`` once before first use so tables exist.
+async def init_db() -> None:
+    # Load variables from .env into the system environment
+    load_dotenv()
+    """Ensure the expenses table and index exist (non-destructive)."""
+    create_sql = """
+    CREATE TABLE IF NOT EXISTS expenses (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      occurred_at DATE NOT NULL,
+      amount INT NOT NULL,
+      currency CHAR(3) NOT NULL DEFAULT 'USD',
+      category VARCHAR(32) NOT NULL,
+      notes VARCHAR(255),
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_expenses_occurred_at (occurred_at)
+    )
     """
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(_DB_PATH)
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text(create_sql))

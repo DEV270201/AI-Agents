@@ -11,3 +11,4 @@ wheels/
 
 # Local SQLite database (schema: data/expense_schema.sql)
 data/expenser.db
+.env
