@@ -60,6 +60,8 @@ IGNORE:
 - Pleasantries and filler ("ok", "thanks", "got it")
 - Intermediate reasoning steps
 - Anything already obvious from context
+- Anything that is not a fact or preference of the user
+- Do not record any expenses, transactions, or financial information
  
 Respond with ONLY a raw JSON object. NO markdown, NO explanation outside the JSON:
 {{

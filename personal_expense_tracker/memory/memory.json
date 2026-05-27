@@ -1,11 +1,6 @@
 {
   "facts": [
-    "Identity facts: Name is Devansh Shah",
-    "USER spent around 17.5 bucks on chocolate ice-cream yesterday",
-    "USER spent another 12 bucks on the F1 movie 5 days back",
-    "USER spent around 5 bucks on cake, 3 bucks on soda yesterday",
-    "USER spent another 10 bucks on grocery 10 days back",
-    "USER spent 9 dollars on idli masala today"
+    "Identity facts: Name is Devansh Shah"
   ],
   "history": [
     "[2026-05-25] The session was about logging various expenses made by the user over different dates."

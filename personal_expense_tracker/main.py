@@ -14,11 +14,15 @@ from parser import parse_response, response_contains_model_observation
 from tools import (
     tool_add_expense,
     tool_analyze_text_and_action,
+    tool_list_expenses,
+    tool_summarize_expenses,
 )
 
 TOOLS = {
     "text_fixer": tool_analyze_text_and_action,
     "add_expense": tool_add_expense,
+    "summarize_expenses": tool_summarize_expenses,
+    "list_expenses": tool_list_expenses,
 }
 
 _LOGGED_EXPENSE_MARKER = "Logged expense id="
@@ -45,6 +49,12 @@ Available tools:
 - add_expense(occurred_at, category, amount, currency?, notes?)
                                          → logs one expense; required: occurred_at (ISO YYYY-MM-DD), category (food, entertainment, bills, shopping, travel) if it fits and amount; optional: currency (default USD), notes (short context: where/what/how e.g. merchant or activity); resolve today/yesterday/last week/last month from the UTC reference line to a specific ISO date
                                          args: {"occurred_at": "2026-05-15", "category": "food", "amount": 12.50, "currency": "USD", "notes": "Starbucks"}
+- summarize_expenses(start_date?, end_date?, sort_type?)
+                                         → summarizes expenses for a UTC date range (inclusive). If dates are omitted, defaults to current UTC calendar week (Mon..today). Always groups by category and always returns exactly top 3 ranked expenses (heavy/light) based on sort_type; sort_type is "max" (default) (most expensive) or "min" (least expensive). Do not do any math yourself; trust the tool output.
+                                         args: {"start_date": "2026-05-19", "end_date": "2026-05-25", "sort_type": "max"}
+- list_expenses(start_date?, end_date?, category?, top_n?, sort_type?)
+                                         → lists ranked expenses (top/bottom N) for a UTC date range (inclusive), optionally filtered by category. No paging: max top_n is 5 and if the user wants to see all expenses tell them to use the application. sort_type is "max" (default) (most expensive) or "min" (least expensive).
+                                         args: {"start_date": "2026-05-19", "end_date": "2026-05-25", "category": "food", "top_n": 5, "sort_type": "max"}
 
 STRICT RULES:
 - ONE JSON per response, nothing before or after it
@@ -55,6 +65,8 @@ STRICT RULES:
 - When done:true, your answer must include results from ALL tasks
 - If the MEMORY block above contains relevant facts about the user, use them in your answers
 - For add_expense: use JSON keys occurred_at, category, amount (and optional currency, notes); resolve dates to ISO using the UTC reference before calling; read the Observation and confirm to the user on success; on Error, fix or ask — do not claim the expense was logged; never pass slash dates or words in args; if the date cannot be resolved to one ISO date, ask the user for day, month, and year before calling
+- For summarize_expenses: prefer this for overview questions ("how does last week look", "where did I spend the most", "how much did I spend on food"). It always includes category totals; answer from those totals rather than calling list_expenses unless the user asks to see individual transactions.
+- For list_expenses: use this only when the user asks to go through transactions, or asks for more than the 3 heavy/light items that summarize_expenses includes. Never try to list all expenses via the agent; direct the user to the application.
 
 """
 
