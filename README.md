@@ -4,7 +4,7 @@ Experimental AI agent built in Python with support for tool calling, structured 
 
 ## Overview
 
-I am developing this project to explore how modern AI agents operate under the hood without heavily relying on orchestration frameworks
+I am developing this project into 3 phases to explore how modern AI agents operate under the hood without heavily relying on orchestration frameworks
 
 The agent can:
 - Perform mathematical calculations
@@ -16,7 +16,10 @@ The project evolved in two phases to improve reliability and orchestration capab
 
 ---
 
-# Architecture
+# Agentic Flow
+<img width="883" height="557" alt="image" src="https://github.com/user-attachments/assets/9a050023-b45a-4024-b835-b52255647be6" />
+
+
 
 ## Phase 1 — Text-Based Tool Orchestration
 
@@ -123,21 +126,21 @@ Example memory:
 ---
 # Phase 3 — Expense Tracker Agent
 
-Capabilities
+### Capabilities
 
 * Log expenses through natural language ("I spent $12 on coffee today")
 * Categorize across five fixed buckets: food, entertainment, bills, shopping, travel
 * Resolve relative dates (today, yesterday, N days ago) to ISO format using a UTC reference injected into the system prompt
 * Validate inputs at the application layer (amount, category, date sanity, length limits)
-* Return structured observations the LLM uses to confirm actions to the user
+* Summarizes user expeneses over a time period with category specific, time interval based along with top-k mininum/maximum expenses 
 
-Why It Matters
+### Why It Matters
 
 This phase forced engagement with concerns the previous phases didn't surface: data schema design, mutation safety, error semantics that the LLM can actually act on, and how to keep the agent's response shape expressive enough to handle ambiguity (e.g., needing to ask the user a clarifying question rather than guessing).
 
-Status
+### Status
 
-The expense tracker currently supports logging only. Update, summarize, and budget tools are deferred to a future phase.
+The expense tracker currently supports ```logging``` and ```summarization```. Update and budget tools are working in progress.
 
 ---
 
@@ -146,6 +149,8 @@ The expense tracker currently supports logging only. Update, summarize, and budg
 - Python
 - Ollama
 - File-based persistence
+- Cursor, Claude (AI tooling)
+- MySQL (Persistence)
 
 ---
 
@@ -160,3 +165,5 @@ This aim of this project is to develop better understanding of concepts that are
 - reliable execution pipelines
 
 instead of treating LLM agents as black-box abstractions.
+
+<h3 align="center"><b>Developed with :heart: by <a href="https://github.com/DEV270201">Devansh Shah</a></b></h3>
